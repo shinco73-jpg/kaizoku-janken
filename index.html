@@ -40,6 +40,8 @@
   .charpick:active{transform:translateY(1px)}
   .stat-line{margin:16px 0 4px;font-size:15px;color:var(--ink);background:#fbeecb;border:1px solid var(--line);border-radius:12px;padding:11px}
   .stat-line b{color:#d64b3e}
+  .reset-btn{margin:8px auto 0;display:inline-block;background:none;border:none;color:var(--ink-soft);font-size:12px;font-weight:800;text-decoration:underline;cursor:pointer;font-family:var(--font-body);touch-action:manipulation}
+  .reset-btn:active{color:var(--danger)}
   .modes{display:flex;flex-direction:column;gap:11px;margin-top:14px}
   .code-row{display:flex;gap:9px}
   .code-row input{flex:1;text-transform:uppercase}
@@ -57,10 +59,10 @@
   .timer.hidden{display:none}
 
   /* ── 固定高さの試合パネル（アバター＋カードを内蔵） ── */
-  .battle{position:relative;height:358px;border:3px solid #6b4a24;border-radius:16px;overflow:hidden;margin:0 0 6px;display:flex;flex-direction:column;box-shadow:0 6px 16px rgba(80,50,10,.18)}
+  .battle{position:relative;height:296px;border:3px solid #6b4a24;border-radius:16px;overflow:hidden;margin:0 0 6px;display:flex;flex-direction:column;box-shadow:0 6px 16px rgba(80,50,10,.18)}
   .battle .tav{position:absolute;inset:0;z-index:0}
-  .stage{position:relative;z-index:1;flex:1;min-height:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:8px;padding:10px 10px 0}
-  .trays{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:5px 8px 8px}
+  .stage{position:relative;z-index:1;flex:1;min-height:0;display:grid;grid-template-columns:1fr 100px 1fr;align-items:end;justify-items:center;gap:8px;padding:8px 8px 0}
+  .trays{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:3px 8px 8px}
   .trays.hidden{display:none}
 
   .fighter{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:2px}
@@ -152,8 +154,9 @@
   .stamps{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
   .stamp{font-family:var(--font-body);font-weight:800;font-size:14px;color:var(--blue-d);background:#eaf5fc;border:2px solid #bfe0f2;border-radius:999px;padding:7px 13px;cursor:pointer;touch-action:manipulation}
   .stamp:active{transform:translateY(1px)}
-  .chatrow{display:flex;gap:8px}
-  .chatrow input{flex:1;padding:12px;border-radius:11px;border:2px solid var(--line);background:#fffdf8;color:var(--ink);font-size:17px;font-family:var(--font-body);font-weight:800}
+  .chatrow{display:flex;gap:8px;align-items:stretch}
+  .chatrow input{flex:1 1 auto;min-width:0;padding:12px;border-radius:11px;border:2px solid var(--line);background:#fffdf8;color:var(--ink);font-size:16px;font-family:var(--font-body);font-weight:800}
+  .chatrow .btn{flex:0 0 auto;padding:12px 16px;font-size:15px}
   .note{margin-top:14px;font-size:12px;color:var(--ink-soft);line-height:1.6;text-align:center;font-weight:700}
   .overlay{position:fixed;inset:0;background:rgba(40,30,15,.55);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
   .overlay.hidden{display:none}
@@ -177,6 +180,7 @@
       <label>キャラを選ぶ</label>
       <div class="chars" id="chars"></div>
       <div class="stat-line" id="stat-line"></div>
+      <button class="reset-btn" id="reset">強さ・成績をリセット</button>
       <div class="modes">
         <button class="btn primary wide" id="auto">自動でマッチ</button>
         <button class="btn blue wide" id="create">友達と部屋を作る</button>
@@ -205,9 +209,9 @@
       <div class="panel opp"><div class="who">相手</div><div class="pname" id="opp-name">&mdash;</div><div><span class="title-tag" id="opp-title">&mdash;</span></div><div class="star-line" id="opp-star"></div><div class="record"><span class="crown">&#128081;</span> <span id="opp-rec">0勝0敗</span></div><div class="strength">強さ：<span class="num" id="opp-str">1500</span><span class="delta" id="opp-delta"></span></div></div>
     </div>
     <div class="banner" id="banner"></div>
-    <div class="actions" id="actions"></div>
     <div class="chatbar"><div class="stamps" id="stamps"></div><div class="chatrow"><input id="chat-input" maxlength="40" placeholder="メッセージ…"><button class="btn blue" id="chat-send">送信</button></div></div>
     <div class="note">勝敗は★の合計が多いほうの勝ち（ノーマル勝ち+1／★でノーマル勝ち+2／★同士勝ち+3）。強さは勝ち+16・負け-16。成績はこの端末に保存されます。</div>
+    <div class="actions" id="actions"></div>
   </div>
 </div>
 
@@ -218,8 +222,8 @@
 <script>
 const HANDS = { goo:{name:"グー",emoji:"\u270A"}, choki:{name:"チョキ",emoji:"\u270C\uFE0F"}, paa:{name:"パー",emoji:"\u270B"} };
 const CHARS = [{id:"1",name:"海賊王"},{id:"2",name:"荒くれ"},{id:"3",name:"船長"},{id:"4",name:"女海賊"},{id:"5",name:"航海士"},{id:"6",name:"提督"},{id:"7",name:"将軍"},{id:"8",name:"少年"},{id:"9",name:"コック"},{id:"10",name:"新米"}];
-const STAMPS = ["よろしく！","いくよ！","やった！","うぐぐ…","ナイス！","またね！"];
-const TITLE_BANDS = [{min:2000,name:"海賊王"},{min:1900,name:"大海賊"},{min:1800,name:"賞金首"},{min:1700,name:"船長"},{min:1620,name:"幹部"},{min:1560,name:"一等航海士"},{min:1500,name:"航海士"},{min:1450,name:"船漕ぎ"},{min:1400,name:"新入り"},{min:1330,name:"下っ端"},{min:0,name:"床磨き"}];
+const STAMPS = ["よろしく！","ありがとう！"];
+const TITLE_BANDS = [{min:2501,name:"海賊王"},{min:2201,name:"大海賊"},{min:1800,name:"賞金首"},{min:1700,name:"船長"},{min:1620,name:"幹部"},{min:1560,name:"一等航海士"},{min:1500,name:"航海士"},{min:1450,name:"船漕ぎ"},{min:1400,name:"新入り"},{min:1330,name:"下っ端"},{min:0,name:"床磨き"}];
 function titleFor(str,games){ if(games<3) return "見習い"; for(const b of TITLE_BANDS){ if(str>=b.min) return b.name; } return "床磨き"; }
 function starIcons(n){ if(n<=0) return '<span class="starzero">\u2605 0</span>'; const cap=Math.min(n,10); return '\u2605'.repeat(cap)+(n>10?'<span class="starcount"> \u00d7'+n+'</span>':''); }
 const el = id => document.getElementById(id);
@@ -236,19 +240,20 @@ el("chars").innerHTML = CHARS.map(c=>'<button class="charpick" data-c="'+c.id+'"
 function refreshChars(){ el("chars").querySelectorAll(".charpick").forEach(b=>b.classList.toggle("sel", b.dataset.c===P.char)); }
 el("chars").querySelectorAll(".charpick").forEach(b=> b.onclick=()=>{ P.char=b.dataset.c; saveProfile(); refreshChars(); });
 refreshChars(); updateStats();
+el("reset").onclick=()=>{ if(confirm("強さと通算成績を最初（強さ1500・見習い）に戻します。よろしいですか？")){ P.strength=1500; P.games=0; P.mwins=0; P.mlosses=0; saveProfile(); updateStats(); } };
 el("name").addEventListener("input", ()=>{ P.name=el("name").value.trim(); });
 el("stamps").innerHTML = STAMPS.map((s,i)=>'<button class="stamp" data-i="'+i+'">'+s+'</button>').join("");
 el("stamps").querySelectorAll(".stamp").forEach(b=> b.onclick=()=> send({t:"chat", text:STAMPS[b.dataset.i]}) );
 el("tav").innerHTML = tavernBG();  // 背景は固定で1回だけ
 
 let ws=null, S=null, myIndex=0, myCode="", myToken=null, localPicked=false, pickTimer=null,
-    heartbeat=null, reconnectTimer=null, joinedGame=false, reconnecting=false;
+    heartbeat=null, reconnectTimer=null, joinedGame=false, reconnecting=false, overTimer=null;
 function send(o){ if(ws && ws.readyState===1) ws.send(JSON.stringify(o)); }
 function showOverlay(id){ el(id).classList.remove("hidden"); }
 function hideOverlay(id){ el(id).classList.add("hidden"); }
 function showTrays(on){ el("trays").classList.toggle("hidden", !on); }
 function enterGame(){ el("lobby").classList.add("hidden"); el("topbar").classList.add("hidden"); el("game").classList.remove("hidden"); }
-function backToLobby(){ joinedGame=false; if(ws){ ws.onclose=null; try{ws.close();}catch(e){} } el("game").classList.add("hidden"); el("topbar").classList.remove("hidden"); el("lobby").classList.remove("hidden"); }
+function backToLobby(){ clearTimeout(overTimer); joinedGame=false; if(ws){ ws.onclose=null; try{ws.close();}catch(e){} } el("game").classList.add("hidden"); el("topbar").classList.remove("hidden"); el("lobby").classList.remove("hidden"); }
 
 function openWS(onOpenSend){
   if(ws){ try{ ws.onclose=null; ws.onerror=null; ws.close(); }catch(e){} }
@@ -298,6 +303,7 @@ function handle(m){
 }
 function onState(){
   if(!S) return;
+  if(S.phase!=="over") clearTimeout(overTimer);
   if(S.phase!=="reveal"){ renderPanels(); renderTrays(); }
   const playing = (S.phase==="playing"||S.phase==="reveal"||S.phase==="over");
   showTrays(playing);
@@ -334,7 +340,7 @@ function barrelsRow(){ let s=""; for(let x=4;x<300;x+=32){ s+='<g transform="tra
 function tavernBG(){ return '<svg viewBox="0 0 300 180" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block"><rect x="0" y="0" width="300" height="180" fill="#b98a52"/><rect x="0" y="0" width="300" height="46" fill="#3a2412"/>'+barrelsRow()+'<rect x="0" y="44" width="300" height="4" fill="#5a3a1e"/><g stroke="#9c7038" stroke-width="1" opacity=".4"><line x1="150" y1="48" x2="10" y2="180"/><line x1="150" y1="48" x2="95" y2="180"/><line x1="150" y1="48" x2="205" y2="180"/><line x1="150" y1="48" x2="290" y2="180"/></g></svg>'; }
 function charFor(side){ if(side==="you") return (S&&S.you&&S.you.char)||"1"; return (S&&S.opp&&S.opp.char)||"2"; }
 function fighterHTML(side,name){ const c=charFor(side);
-  return '<div class="fighter '+side+'"><div class="cap">'+name+'</div><div class="hand-wrap"><span class="hand-anim" id="'+side+'-hand">\u270A</span><span class="hand-star" id="'+side+'-hstar"></span></div><div class="avatar"><img class="ava'+(side==="opp"?" flip":"")+'" src="/img/'+c+'.png" alt=""></div>'+matSVG()+'</div>'; }
+  return '<div class="fighter '+side+'"><div class="cap">'+name+'</div><div class="hand-wrap"><span class="hand-anim" id="'+side+'-hand">\u270A</span><span class="hand-star" id="'+side+'-hstar"></span></div><div class="avatar"><img class="ava'+(side==="opp"?" flip":"")+'" src="/img/'+c+'.png" alt=""></div></div>'; }
 function sparkle(container){ const marks=["\u2728","\u2605","\u2727","\uD83C\uDF1F","\u2728","\u2605","\u2727","\uD83C\uDF1F","\u2728","\u2605","\u2727","\uD83C\uDF1F","\u2728","\u2605","\u2727","\uD83C\uDF1F"];
   for(let k=0;k<16;k++){ const s=document.createElement("span"); s.className="spark"; s.textContent=marks[k]; s.style.left=(8+Math.random()*84)+"%"; s.style.top=(Math.random()*80)+"%"; s.style.animationDelay=(Math.random()*0.4)+"s"; container.appendChild(s); } }
 function confetti(container){ const colors=["#ffbe1a","#e0553b","#4f9d69","#3f7fbf","#ecc981","#e98cb0","#7fbf7f","#ff7b95","#68b6e6"];
@@ -353,18 +359,26 @@ function animateRound(you, opp, result, done){
       if(you.star){ const s=el("you-hstar"); s.textContent="\u2605"; s.classList.add("show"); yh.classList.add("star-glow"); sparkle(yh.closest(".fighter")); }
       if(opp.star){ const s=el("opp-hstar"); s.textContent="\u2605"; s.classList.add("show"); oh.classList.add("star-glow"); sparkle(oh.closest(".fighter")); }
       const label=result==="win"?"勝ち！":result==="lose"?"負け…":"あいこ"; slot.innerHTML='<div class="result-pop '+result+'">'+label+'</div>';
-      if(result==="win"){ flash(); confetti(el("battle")); }
+      if(result==="win"){ flash(); }
     } }, 500);
   setTimeout(done, 500*3+1600);
 }
 function onGameOver(m){
-  stopPickTimer(); showTimer(false);
+  stopPickTimer(); showTimer(false); hideOverlay("pause-ov");
   P.strength += m.delta; P.games += 1; if(m.result==="win") P.mwins++; else if(m.result==="lose") P.mlosses++; saveProfile(); updateStats();
-  const msg = m.result==="win" ? ("\u2693 星 "+m.yourStar+"\u2014"+m.oppStar+" であなたの勝利！") : m.result==="lose" ? ("\u2620 星 "+m.oppStar+"\u2014"+m.yourStar+" で相手の勝利…") : ("\uD83C\uDFF4 星 "+m.yourStar+"\u2014"+m.oppStar+" で引き分け");
+  let msg;
+  if(m.forfeit) msg = "\u2693 相手が抜けたので あなたの勝ち！";
+  else msg = m.result==="win" ? ("\u2693 星 "+m.yourStar+"\u2014"+m.oppStar+" であなたの勝利！") : m.result==="lose" ? ("\u2620 星 "+m.oppStar+"\u2014"+m.yourStar+" で相手の勝利…") : ("\uD83C\uDFF4 星 "+m.yourStar+"\u2014"+m.oppStar+" で引き分け");
   el("banner").textContent=msg; showDelta("you-delta", m.delta);
-  el("actions").innerHTML='<button class="btn primary" id="rematch">もう一戦</button> <button class="btn blue" id="leave">ロビーへ</button>';
-  el("rematch").onclick=()=>{ send({t:"rematch"}); el("banner").textContent="相手のもう一戦を待っています…"; el("actions").innerHTML=""; };
-  el("leave").onclick=backToLobby;
+  if(m.forfeit){
+    el("actions").innerHTML='<button class="btn blue" id="leave">ロビーへ</button>';
+    el("leave").onclick=backToLobby;
+  } else {
+    el("actions").innerHTML='<button class="btn primary" id="rematch">もう一戦</button> <button class="btn blue" id="leave">ロビーへ</button>';
+    el("rematch").onclick=()=>{ clearTimeout(overTimer); send({t:"rematch"}); el("banner").textContent="相手のもう一戦を待っています…"; el("actions").innerHTML=""; };
+    el("leave").onclick=backToLobby;
+  }
+  clearTimeout(overTimer); overTimer=setTimeout(()=>{ if(joinedGame) backToLobby(); }, 60000);
   if(m.result==="win"){ flash(); confetti(el("battle")); }
 }
 </script>
