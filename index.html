@@ -1,235 +1,226 @@
 <!--
-  海賊じゃんけん 対人対戦（クライアント）
-  - server.py（FastAPI）に WebSocket でつないで2人対戦
-  - 自動マッチ / 友達と部屋 / チャット吹き出し / キャラ作成・成績保存（ブラウザ保存）
+  海賊じゃんけん 対人対戦（クライアント）明るい白テーマ・大きい文字・派手な演出
 -->
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>海賊じゃんけん 対戦</title>
+<title>パイレーツオブじゃんけん</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
   :root{
-    --sea-deep:#0a1a24; --sea:#12303d; --sea-line:#1c4a5a;
-    --brass:#d4a24e; --brass-light:#ecc981;
-    --parchment:#efe0bd; --parchment-dark:#d9c496;
-    --ink:#2a2016; --foam:#f3ede0;
-    --danger:#c04a3b; --win:#7fbf7f; --star:#f2c14e;
-    --you:#2f6d86; --cpu:#a8496a;
-    --font-body:"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
-    --font-display:"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Hiragino Kaku Gothic ProN",sans-serif;
+    --bg:#fbf4e6; --panel:#ffffff; --ink:#3a2b1a; --ink-soft:#7a6a52; --line:#e4d5b8;
+    --brass:#e0952f; --brass-d:#b9761e;
+    --you:#4aa3cf; --you-bg:#dceff8; --opp:#e67aa0; --opp-bg:#fbe1ea;
+    --pink:#ef5f7e; --pink-d:#cf3f5f; --blue:#4a9fd4; --blue-d:#2f7fb4;
+    --star:#ffbe1a; --win:#3fae63; --danger:#e0553b;
+    --font-body:"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Hiragino Kaku Gothic ProN",sans-serif;
+    --font-display:"M PLUS Rounded 1c","Hiragino Maru Gothic ProN",sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:var(--font-body);font-weight:700;color:var(--foam);min-height:100vh;min-height:100dvh;overflow-x:hidden;
+  body{font-family:var(--font-body);font-weight:800;color:var(--ink);min-height:100vh;min-height:100dvh;overflow-x:hidden;
     -webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;
-    background:radial-gradient(1200px 600px at 50% -10%, #1a4657 0%, transparent 60%),
-      repeating-linear-gradient(180deg, transparent 0 38px, rgba(255,255,255,.015) 38px 39px), var(--sea-deep);
+    background:radial-gradient(900px 500px at 50% -8%, #fff7e6 0%, transparent 60%), var(--bg);
     display:flex;justify-content:center;
-    padding:max(16px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(28px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left))}
-  .board{width:100%;max-width:640px}
+    padding:max(16px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(28px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+  .board{width:100%;max-width:660px}
   header{text-align:center;margin-bottom:12px}
-  .compass{font-size:26px;color:var(--brass);opacity:.85}
-  h1{font-family:var(--font-display);font-weight:800;font-size:clamp(28px,7vw,46px);letter-spacing:.1em;
-     color:var(--brass-light);text-shadow:0 2px 0 rgba(0,0,0,.4),0 0 26px rgba(212,162,78,.28);margin:2px 0}
-  .subtitle{font-size:11px;letter-spacing:.3em;color:var(--parchment-dark);text-transform:uppercase;opacity:.7}
+  .compass{font-size:30px;color:var(--brass)}
+  h1{font-family:var(--font-display);font-weight:900;font-size:clamp(24px,6.8vw,44px);letter-spacing:.01em;
+     color:#d64b3e;text-shadow:0 2px 0 #fff,0 3px 0 #b93a2f,0 0 22px rgba(214,75,62,.25);margin:2px 0}
+  .subtitle{font-size:13px;letter-spacing:.28em;color:var(--ink-soft);text-transform:uppercase}
 
   /* ── ロビー ── */
-  .lobby-card{max-width:380px;margin:14px auto 0;background:linear-gradient(180deg,#153a49,#0e2833);
-    border:1px solid var(--sea-line);border-radius:14px;padding:18px 18px;text-align:center}
-  .lobby-card label{display:block;font-size:12px;color:var(--parchment-dark);letter-spacing:.08em;margin:12px 0 5px;text-align:left}
-  .lobby-card input{width:100%;padding:12px 12px;border-radius:9px;border:1px solid var(--sea-line);
-    background:#0c222c;color:var(--foam);font-size:16px;font-family:var(--font-body);font-weight:700}
-  .swatches{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
-  .swatch{width:34px;height:34px;border-radius:50%;border:3px solid transparent;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,.4)}
-  .swatch.sel{border-color:#fff;transform:scale(1.08)}
-  .stat-line{margin:14px 0 4px;font-size:12px;color:var(--parchment);background:rgba(0,0,0,.2);border-radius:8px;padding:8px}
-  .stat-line b{color:var(--brass-light)}
-  .modes{display:flex;flex-direction:column;gap:9px;margin-top:14px}
-  .code-row{display:flex;gap:8px}
+  .lobby-card{max-width:400px;margin:14px auto 0;background:var(--panel);border:2px solid var(--line);border-radius:18px;padding:20px;text-align:center;box-shadow:0 8px 22px rgba(120,90,40,.12)}
+  .lobby-card label{display:block;font-size:15px;color:var(--ink-soft);margin:14px 0 6px;text-align:left;font-weight:800}
+  .lobby-card input{width:100%;padding:14px;border-radius:12px;border:2px solid var(--line);background:#fffdf8;color:var(--ink);font-size:18px;font-family:var(--font-body);font-weight:800}
+  .swatches{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .swatch{width:40px;height:40px;border-radius:50%;border:4px solid transparent;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,.25)}
+  .swatch.sel{border-color:var(--ink);transform:scale(1.1)}
+  .chars{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:4px}
+  .charpick{background:#fffdf8;border:2px solid var(--line);border-radius:12px;padding:5px 2px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;touch-action:manipulation}
+  .charpick img{width:100%;max-width:56px;height:56px;object-fit:contain;display:block}
+  .charpick span{font-size:10px;color:var(--ink-soft);font-weight:800}
+  .charpick.sel{border-color:var(--brass);background:#fff3d6;box-shadow:0 0 0 3px rgba(224,149,47,.3)}
+  .charpick:active{transform:translateY(1px)}
+  .stat-line{margin:16px 0 4px;font-size:15px;color:var(--ink);background:#fbeecb;border:1px solid var(--line);border-radius:12px;padding:11px}
+  .stat-line b{color:#d64b3e}
+  .modes{display:flex;flex-direction:column;gap:11px;margin-top:14px}
+  .code-row{display:flex;gap:9px}
   .code-row input{flex:1;text-transform:uppercase}
-  .lobby-err{color:#ffb0a4;font-size:12px;margin-top:12px;min-height:16px}
-  .btn{font-family:var(--font-body);font-weight:700;font-size:14px;letter-spacing:.04em;border:none;border-radius:10px;
-    padding:13px 20px;cursor:pointer;white-space:nowrap;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-  .btn.primary{color:var(--sea-deep);background:linear-gradient(180deg,var(--brass-light),var(--brass));box-shadow:0 4px 0 #a67c2f}
-  .btn.ghost{color:var(--parchment);background:#1c3a47;border:1px solid var(--sea-line);box-shadow:0 4px 0 #0e2530}
-  .btn.surrender{color:#ffd8cf;background:#5c2b2b;border:1px solid #8f4a44;box-shadow:0 4px 0 #3a1b1b}
-  .btn:active{transform:translateY(2px)}
+  .lobby-err{color:var(--danger);font-size:14px;margin-top:12px;min-height:18px}
+  .btn{font-family:var(--font-body);font-weight:900;font-size:17px;border:none;border-radius:14px;padding:15px 22px;cursor:pointer;white-space:nowrap;touch-action:manipulation;color:#fff}
+  .btn.primary{background:linear-gradient(180deg,#ff7b95,var(--pink));box-shadow:0 5px 0 var(--pink-d)}
+  .btn.blue{background:linear-gradient(180deg,#68b6e6,var(--blue));box-shadow:0 5px 0 var(--blue-d)}
+  .btn.ghost{background:linear-gradient(180deg,#68b6e6,var(--blue));box-shadow:0 5px 0 var(--blue-d)}
+  .btn.surrender{background:linear-gradient(180deg,#f08e79,#d65640);box-shadow:0 5px 0 #a83d2b}
+  .btn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.3)}
   .btn.wide{width:100%}
 
-  .timer{margin:12px auto 6px;max-width:340px;text-align:center;background:linear-gradient(180deg,#153a49,#0e2833);
-    border:1px solid var(--sea-line);border-radius:999px;padding:8px 18px;font-size:15px;letter-spacing:.06em;color:var(--parchment)}
-  .timer b{font-family:var(--font-display);font-size:24px;color:var(--brass-light);margin:0 4px}
+  .timer{margin:12px auto 8px;max-width:360px;text-align:center;background:var(--panel);border:2px solid var(--line);border-radius:999px;padding:10px 20px;font-size:18px;color:var(--ink);box-shadow:0 4px 10px rgba(120,90,40,.12);font-weight:800}
+  .timer b{font-family:var(--font-display);font-size:30px;color:#d64b3e;margin:0 5px}
   .timer.warn b{color:var(--danger)}
   .timer.hidden{display:none}
 
   /* ── 対戦エリア ── */
   .arena-wrap{position:relative}
-  .arena{position:relative;margin:10px 0;min-height:158px;
-    background:radial-gradient(400px 200px at 50% 40%, rgba(212,162,78,.06), transparent 70%),linear-gradient(180deg,#0e2b37,#0a212b);
-    border:1px solid var(--sea-line);border-radius:14px;padding:18px 14px;
-    display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px}
+  .arena{position:relative;margin:10px 0;min-height:172px;background:#0e2b37;border:3px solid #6b4a24;border-radius:16px;padding:18px 14px;
+    display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;box-shadow:0 6px 16px rgba(80,50,10,.18)}
   .arena.stage{align-items:end;background:transparent;overflow:hidden}
-  svg.tavern-bg{position:absolute;inset:0;width:100%;height:100%;border-radius:14px;z-index:0}
+  svg.tavern-bg{position:absolute;inset:0;width:100%;height:100%;border-radius:13px;z-index:0}
   .fighter{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:2px}
-  .fighter .cap{font-size:11px;letter-spacing:.02em;color:var(--foam);font-weight:800;margin-bottom:3px;
-    max-width:104px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-    background:rgba(20,14,6,.62);border:1px solid var(--brass);border-radius:999px;padding:2px 11px;box-shadow:0 2px 4px rgba(0,0,0,.45)}
-  .fighter.you .cap{border-color:#5aa6c4}
-  .fighter.opp .cap{border-color:#d98cae}
-  .hand-anim{font-size:33px;line-height:1;filter:drop-shadow(0 4px 6px rgba(0,0,0,.4));transition:filter .2s}
-  .hand-anim.shaking{animation:bob .3s ease-in-out infinite}
-  .hand-anim.pop{animation:pop .32s ease}
-  .hand-anim.star-glow{filter:drop-shadow(0 0 7px var(--star)) drop-shadow(0 0 13px var(--star))}
-  @keyframes bob{0%,100%{transform:translateY(0) rotate(-8deg)}50%{transform:translateY(-11px) rotate(8deg)}}
-  @keyframes pop{0%{transform:scale(.55)}55%{transform:scale(1.25)}100%{transform:scale(1)}}
-  .avatar svg.pirate{width:58px;height:auto;display:block}
-  svg.mat{width:74px;height:auto;display:block;margin-top:-3px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.4))}
-  .verdict-slot{position:relative;z-index:1;min-width:64px;text-align:center;align-self:center}
-  .verdict-slot .prompt{font-size:12px;color:#40260f;font-weight:800;line-height:1.45;text-shadow:0 1px 0 rgba(255,255,255,.25)}
-  .spark{position:absolute;font-size:15px;color:var(--star);animation:sparkle .8s ease forwards;pointer-events:none;z-index:2}
-  @keyframes sparkle{0%{transform:scale(0) rotate(0);opacity:0}30%{opacity:1}100%{transform:scale(1.5) rotate(140deg);opacity:0}}
-  .count-num{font-family:var(--font-display);font-weight:800;font-size:clamp(30px,9vw,46px);color:var(--brass-light);text-shadow:0 2px 0 rgba(0,0,0,.4);animation:countpop .48s ease}
-  @keyframes countpop{0%{transform:scale(.4);opacity:0}45%{transform:scale(1.18);opacity:1}100%{transform:scale(1);opacity:.95}}
-  .result-pop{position:relative;z-index:2;font-family:var(--font-display);font-weight:800;font-size:clamp(24px,7vw,36px);text-shadow:0 2px 0 rgba(0,0,0,.35);animation:popin .5s cubic-bezier(.2,1.5,.4,1)}
-  .result-pop.win{color:#8ff0a0} .result-pop.lose{color:#ff8f7a} .result-pop.draw{color:#f0e0b0}
-  @keyframes popin{0%{transform:scale(0) rotate(-14deg);opacity:0}55%{transform:scale(1.28) rotate(7deg)}100%{transform:scale(1) rotate(0);opacity:1}}
-  .confetti{position:absolute;top:-14px;border-radius:1px;z-index:3;animation:fall linear forwards;pointer-events:none}
-  @keyframes fall{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(210px) rotate(540deg);opacity:.15}}
-  .round-banner{grid-column:1/-1;align-self:center;text-align:center;position:relative;z-index:2;
-    font-family:var(--font-display);font-weight:800;font-size:clamp(30px,9vw,50px);letter-spacing:.04em;color:#fff;
-    text-shadow:0 3px 0 rgba(0,0,0,.45),0 0 18px rgba(212,162,78,.5);animation:bannerpop .9s ease forwards}
-  .round-banner.round{color:#ffe6a6} .round-banner.start{color:#a6f0b0}
-  @keyframes bannerpop{0%{transform:scale(.4) rotate(-6deg);opacity:0}20%{transform:scale(1.12) rotate(2deg);opacity:1}75%{transform:scale(1) rotate(0);opacity:1}100%{transform:scale(1.06);opacity:0}}
+  .fighter .cap{font-size:13px;color:#fff;font-weight:900;margin-bottom:3px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    background:rgba(20,14,6,.72);border:2px solid var(--brass);border-radius:999px;padding:3px 13px;box-shadow:0 2px 5px rgba(0,0,0,.5)}
+  .fighter.you .cap{border-color:#7cc4e6} .fighter.opp .cap{border-color:#f2a6c4}
+  .hand-anim{font-size:40px;line-height:1;filter:drop-shadow(0 4px 6px rgba(0,0,0,.4));transition:filter .2s}
+  .hand-anim.shaking{animation:bob .28s ease-in-out infinite}
+  .hand-anim.pop{animation:pop .34s ease}
+  .hand-anim.star-glow{filter:drop-shadow(0 0 9px var(--star)) drop-shadow(0 0 16px var(--star))}
+  @keyframes bob{0%,100%{transform:translateY(0) rotate(-10deg)}50%{transform:translateY(-13px) rotate(10deg)}}
+  @keyframes pop{0%{transform:scale(.5)}55%{transform:scale(1.35)}100%{transform:scale(1)}}
+  .avatar svg.pirate{width:66px;height:auto;display:block}
+  .avatar img.ava{height:88px;width:auto;display:block;filter:drop-shadow(0 5px 6px rgba(0,0,0,.45))}
+  .avatar img.ava.flip{transform:scaleX(-1)}
+  svg.mat{width:82px;height:auto;display:block;margin-top:-3px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.4))}
+  .verdict-slot{position:relative;z-index:1;min-width:72px;text-align:center;align-self:center}
+  .verdict-slot .prompt{font-size:14px;color:#40260f;font-weight:900;line-height:1.4;text-shadow:0 1px 0 rgba(255,255,255,.3)}
+  .spark{position:absolute;font-size:20px;color:var(--star);animation:sparkle .9s ease forwards;pointer-events:none;z-index:4}
+  @keyframes sparkle{0%{transform:scale(0) rotate(0);opacity:0}25%{opacity:1}100%{transform:scale(1.8) rotate(160deg);opacity:0}}
+  .count-num{font-family:var(--font-display);font-weight:900;font-size:clamp(40px,12vw,64px);color:#fff;text-shadow:0 3px 0 #b9761e,0 0 20px rgba(255,190,26,.7);animation:countpop .48s ease}
+  @keyframes countpop{0%{transform:scale(.3) rotate(-8deg);opacity:0}45%{transform:scale(1.3) rotate(4deg);opacity:1}100%{transform:scale(1);opacity:.98}}
+  .result-pop{position:relative;z-index:4;font-family:var(--font-display);font-weight:900;font-size:clamp(30px,9vw,48px);animation:popin .55s cubic-bezier(.2,1.7,.4,1)}
+  .result-pop.win{color:#ffe36a;text-shadow:0 2px 0 #d64b3e,0 0 22px rgba(255,215,90,.95)}
+  .result-pop.lose{color:#fff;text-shadow:0 2px 0 #7a4a3a,0 0 16px rgba(0,0,0,.5)}
+  .result-pop.draw{color:#fff;text-shadow:0 2px 0 #6a6a6a}
+  @keyframes popin{0%{transform:scale(0) rotate(-16deg);opacity:0}55%{transform:scale(1.35) rotate(8deg)}100%{transform:scale(1) rotate(0);opacity:1}}
+  .confetti{position:absolute;top:-16px;border-radius:1px;z-index:6;animation:fall linear forwards;pointer-events:none}
+  @keyframes fall{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(240px) rotate(680deg);opacity:.1}}
+  .flash{position:absolute;inset:0;border-radius:14px;z-index:5;pointer-events:none;
+    background:radial-gradient(circle at 50% 46%, rgba(255,244,190,.95), rgba(255,210,80,.35) 42%, transparent 72%);animation:flashpop .6s ease forwards}
+  .flash.hidden{display:none}
+  @keyframes flashpop{0%{opacity:0;transform:scale(.6)}30%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.15)}}
+  .round-banner{grid-column:1/-1;align-self:center;text-align:center;position:relative;z-index:4;
+    font-family:var(--font-display);font-weight:900;font-size:clamp(38px,11vw,62px);letter-spacing:.03em;color:#fff;
+    text-shadow:0 4px 0 #b93a2f,0 0 24px rgba(255,215,90,.8);animation:bannerpop .9s ease forwards}
+  .round-banner.round{color:#ffe36a} .round-banner.start{color:#a6f0b0}
+  @keyframes bannerpop{0%{transform:scale(.3) rotate(-8deg);opacity:0}20%{transform:scale(1.2) rotate(3deg);opacity:1}75%{transform:scale(1) rotate(0);opacity:1}100%{transform:scale(1.1);opacity:0}}
   .pick-card{min-height:0;opacity:0}
-  .pick-card.show{opacity:1;animation:cardpop .4s cubic-bezier(.2,1.5,.4,1)}
-  .pick-card .box{display:inline-flex;flex-direction:column;align-items:center;gap:1px;position:relative;
-    background:linear-gradient(180deg,#26282e,#0c0d11);border:1px solid #c9a24e;border-radius:7px;padding:3px 9px;box-shadow:0 3px 6px rgba(0,0,0,.5)}
-  .pick-card .box .e{font-size:17px;line-height:1}
-  .pick-card .box .n{font-size:9px;color:var(--parchment)}
-  .pick-card .box .st{position:absolute;top:-7px;right:-6px;color:#ffcf33;font-size:15px;text-shadow:0 0 5px rgba(255,200,40,.9),0 1px 1px #000}
-  @keyframes cardpop{0%{transform:translateY(6px) scale(.6);opacity:0}60%{transform:translateY(0) scale(1.15)}100%{transform:scale(1);opacity:1}}
+  .pick-card.show{opacity:1;animation:cardpop .42s cubic-bezier(.2,1.6,.4,1)}
+  .pick-card .box{display:inline-flex;flex-direction:column;align-items:center;gap:1px;position:relative;background:linear-gradient(180deg,#26282e,#0c0d11);border:2px solid #ffcf33;border-radius:8px;padding:4px 11px;box-shadow:0 3px 7px rgba(0,0,0,.55)}
+  .pick-card .box .e{font-size:21px;line-height:1}
+  .pick-card .box .n{font-size:11px;color:#fff}
+  .pick-card .box .st{position:absolute;top:-9px;right:-8px;color:#ffcf33;font-size:19px;text-shadow:0 0 6px rgba(255,200,40,.95),0 1px 1px #000}
+  @keyframes cardpop{0%{transform:translateY(7px) scale(.5);opacity:0}60%{transform:translateY(0) scale(1.2)}100%{transform:scale(1);opacity:1}}
 
   /* 吹き出し */
-  .bubble{position:absolute;top:6px;max-width:44%;z-index:6;background:#fff;color:#20242a;font-size:12px;font-weight:800;line-height:1.35;
-    padding:7px 11px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,.45);animation:bubblein .22s ease;word-break:break-word}
+  .bubble{position:absolute;top:6px;max-width:44%;z-index:8;background:#fff;color:#20242a;font-size:14px;font-weight:900;line-height:1.35;padding:9px 13px;border-radius:14px;box-shadow:0 5px 12px rgba(0,0,0,.35);animation:bubblein .22s ease;word-break:break-word;border:2px solid #ffd98a}
   .bubble.you{left:8px} .bubble.opp{right:8px}
-  .bubble::after{content:"";position:absolute;bottom:-6px;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:7px solid #fff}
-  .bubble.you::after{left:16px} .bubble.opp::after{right:16px}
+  .bubble::after{content:"";position:absolute;bottom:-8px;width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid #fff}
+  .bubble.you::after{left:18px} .bubble.opp::after{right:18px}
   .bubble.hidden{display:none}
-  @keyframes bubblein{0%{transform:scale(.6) translateY(6px);opacity:0}100%{transform:scale(1);opacity:1}}
+  @keyframes bubblein{0%{transform:scale(.5) translateY(7px);opacity:0}100%{transform:scale(1);opacity:1}}
 
   /* 待機・準備 */
-  .wait-box{grid-column:1/-1;align-self:center;text-align:center;position:relative;z-index:1;color:#40260f}
-  .wait-title{font-family:var(--font-display);font-size:20px;font-weight:800}
-  .wait-code{margin-top:8px;font-size:14px}
-  .wait-code b{font-family:var(--font-display);font-size:26px;color:#7a2f22;letter-spacing:.15em;background:#f0e0bd;padding:2px 12px;border-radius:8px;border:1px solid #b89b5e}
-  .wait-hint{margin-top:8px;font-size:11px;color:#5a3a1e}
+  .wait-box{grid-column:1/-1;align-self:center;text-align:center;position:relative;z-index:1;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+  .wait-title{font-family:var(--font-display);font-size:24px;font-weight:900}
+  .wait-code{margin-top:10px;font-size:16px}
+  .wait-code b{font-family:var(--font-display);font-size:30px;color:#7a2f22;letter-spacing:.15em;background:#ffe9bd;padding:3px 15px;border-radius:10px;border:2px solid #b89b5e}
+  .wait-hint{margin-top:10px;font-size:13px}
   .ready-screen{grid-column:1/-1;text-align:center;position:relative;z-index:1;align-self:center;padding:6px 0}
-  .rules-card{max-width:330px;margin:0 auto;background:linear-gradient(180deg,#123240,#0d2530);border:1px solid var(--sea-line);border-radius:12px;padding:14px 16px}
-  .rules-card .rt{font-family:var(--font-display);font-weight:800;font-size:17px;color:var(--brass-light);margin-bottom:8px;letter-spacing:.06em}
-  .rules-card ul{list-style:none;text-align:left;font-size:12px;line-height:1.7;color:var(--parchment);margin:0 auto 12px;max-width:260px}
-  .rules-card li::before{content:"\2693 ";color:var(--brass)}
-  .ready-row{display:flex;gap:8px;justify-content:center;margin-bottom:12px;flex-wrap:wrap}
-  .ready-badge{font-size:11px;padding:4px 9px;border-radius:6px;border:1px solid}
-  .ready-badge.wait{color:var(--parchment-dark);border-color:var(--sea-line);background:rgba(255,255,255,.03)}
-  .ready-badge.ok{color:#bfe6c0;border-color:#4f8a54;background:rgba(80,150,90,.16)}
-  .waiting-small{font-size:12px;color:var(--parchment-dark)}
+  .rules-card{max-width:340px;margin:0 auto;background:#fffdf7;border:2px solid var(--brass);border-radius:14px;padding:15px 17px;box-shadow:0 6px 16px rgba(0,0,0,.3)}
+  .rules-card .rt{font-family:var(--font-display);font-weight:900;font-size:20px;color:#d64b3e;margin-bottom:9px}
+  .rules-card ul{list-style:none;text-align:left;font-size:14px;line-height:1.7;color:var(--ink);margin:0 auto 13px;max-width:270px;font-weight:800}
+  .rules-card li::before{content:"\2693 ";color:var(--brass-d)}
+  .ready-row{display:flex;gap:8px;justify-content:center;margin-bottom:13px;flex-wrap:wrap}
+  .ready-badge{font-size:13px;padding:5px 11px;border-radius:8px;border:2px solid;font-weight:800}
+  .ready-badge.wait{color:var(--ink-soft);border-color:var(--line);background:#f4ecda}
+  .ready-badge.ok{color:#2e7d43;border-color:#7fc98f;background:#e2f5e6}
+  .waiting-small{font-size:14px;color:var(--ink-soft);font-weight:800}
 
   /* ── 手札（黒カード・大きい★） ── */
-  .tray-label{font-size:12px;letter-spacing:.08em;color:var(--parchment-dark);text-align:center;font-weight:800;margin:8px 2px 6px}
-  .tray-label.you{color:#8fc3d8} .tray-label.opp{color:#e2a0b8}
-  .duel{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
-  .hand-tray{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
-  .card{position:relative;cursor:pointer;background:linear-gradient(180deg,#24262c,#0b0c10);color:var(--foam);
-    border:2px solid #c9a24e;border-radius:10px;padding:11px 2px 9px;text-align:center;
-    box-shadow:0 4px 0 #000,0 8px 14px rgba(0,0,0,.5);transition:transform .12s ease,box-shadow .12s ease;
-    user-select:none;touch-action:manipulation;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
-  .card:hover:not(.used):not(.cpu){transform:translateY(-3px)}
-  .card .emoji{font-size:26px;line-height:1;display:block}
-  .card .name{font-size:10px;margin-top:2px;font-weight:800;letter-spacing:.02em;color:var(--parchment)}
-  .card .star{position:absolute;top:-8px;right:-7px;color:#ffcf33;font-size:19px;z-index:2;text-shadow:0 0 6px rgba(255,200,40,.95),0 1px 1px #000}
-  .card.used{cursor:default;filter:grayscale(.6) brightness(.7)}
-  .card.used::after{content:"使用済み";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    background:rgba(0,0,0,.6);color:var(--foam);font-size:10px;letter-spacing:.12em;border-radius:8px}
-  .card.cpu{border-color:#5c86a0;cursor:default}
-  .card.cpu .star{color:#ffd633}
+  .tray-label{font-size:15px;color:var(--ink-soft);text-align:center;font-weight:900;margin:10px 2px 7px}
+  .tray-label.you{color:var(--blue-d)} .tray-label.opp{color:var(--opp)}
+  .duel{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0}
+  .hand-tray{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .card{position:relative;cursor:pointer;background:linear-gradient(180deg,#2a2c33,#0b0c10);color:#fff;border:2px solid #ffcf33;border-radius:12px;padding:14px 2px 11px;text-align:center;
+    box-shadow:0 5px 0 #000,0 8px 14px rgba(0,0,0,.4);transition:transform .12s ease;user-select:none;touch-action:manipulation;-webkit-touch-callout:none}
+  .card:hover:not(.used):not(.cpu){transform:translateY(-4px)}
+  .card .emoji{font-size:32px;line-height:1;display:block}
+  .card .name{font-size:13px;margin-top:3px;font-weight:900;color:#ffe9c0}
+  .card .star{position:absolute;top:-11px;right:-9px;color:#ffcf33;font-size:26px;z-index:2;text-shadow:0 0 8px rgba(255,205,50,1),0 2px 2px #000}
+  .card.used{cursor:default;filter:grayscale(.6) brightness(.6)}
+  .card.used::after{content:"使用済み";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.62);color:#fff;font-size:12px;letter-spacing:.1em;border-radius:10px}
+  .card.cpu{border-color:#7cc4e6;cursor:default}
 
   /* ── パネル ── */
-  .panels{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
-  .panel{border-radius:12px;padding:10px 11px;border:1px solid rgba(255,255,255,.12)}
-  .panel.you{background:linear-gradient(180deg,rgba(47,109,134,.35),rgba(20,48,61,.5));border-color:var(--you)}
-  .panel.opp{background:linear-gradient(180deg,rgba(168,73,106,.32),rgba(45,20,33,.5));border-color:var(--cpu)}
-  .panel .who{font-size:11px;letter-spacing:.1em;color:var(--parchment-dark)}
-  .panel .pname{font-weight:800;font-size:14px;margin:1px 0 4px}
-  .panel .title-tag{font-family:var(--font-display);font-weight:800;font-size:15px;color:var(--brass-light)}
-  .star-line{min-height:20px;font-size:17px;color:var(--star);letter-spacing:1px;margin:2px 0;text-shadow:0 1px 1px rgba(0,0,0,.4)}
-  .star-line .starzero{color:var(--parchment-dark);font-size:12px}
-  .star-line .starcount{color:var(--parchment-dark);font-size:11px}
-  .panel .record{font-size:13px;margin-top:5px}
-  .panel .record .crown{color:var(--star)}
-  .panel .strength{font-size:12px;color:var(--parchment-dark);margin-top:2px}
-  .panel .strength .num{color:var(--foam);font-weight:800}
-  .panel .delta{font-size:11px;margin-left:4px}
+  .panels{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}
+  .panel{border-radius:16px;padding:12px 13px;border:3px solid}
+  .panel.you{background:var(--you-bg);border-color:var(--you)}
+  .panel.opp{background:var(--opp-bg);border-color:var(--opp)}
+  .panel .who{font-size:12px;letter-spacing:.08em;color:var(--ink-soft);font-weight:800}
+  .panel .pname{font-weight:900;font-size:17px;margin:1px 0 5px;color:var(--ink)}
+  .panel .title-tag{display:inline-block;font-family:var(--font-display);font-weight:900;font-size:16px;color:#fff;border-radius:999px;padding:2px 12px}
+  .panel.you .title-tag{background:var(--you)} .panel.opp .title-tag{background:var(--opp)}
+  .star-line{min-height:24px;font-size:22px;color:var(--star);letter-spacing:1px;margin:4px 0;text-shadow:0 1px 1px rgba(180,120,0,.4)}
+  .star-line .starzero{color:var(--ink-soft);font-size:14px}
+  .star-line .starcount{color:var(--ink-soft);font-size:13px}
+  .panel .record{font-size:15px;margin-top:4px;color:var(--ink);font-weight:800}
+  .panel .record .crown{color:#f0a92f}
+  .panel .strength{font-size:14px;color:var(--ink-soft);margin-top:2px;font-weight:800}
+  .panel .strength .num{color:var(--ink);font-weight:900}
+  .panel .delta{font-size:13px;margin-left:5px}
   .panel .delta.up{color:var(--win)} .panel .delta.down{color:var(--danger)}
 
-  .banner{text-align:center;margin:14px 0 4px;min-height:26px;font-family:var(--font-display);font-weight:800;font-size:19px;color:var(--brass-light)}
+  .banner{text-align:center;margin:16px 0 4px;min-height:28px;font-family:var(--font-display);font-weight:900;font-size:22px;color:#d64b3e}
   .actions{text-align:center;margin-top:12px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 
-  /* チャット入力 */
-  .chatbar{margin-top:14px;background:rgba(0,0,0,.2);border:1px solid var(--sea-line);border-radius:12px;padding:8px}
-  .stamps{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:7px}
-  .stamp{font-family:var(--font-body);font-weight:700;font-size:12px;color:var(--parchment);background:#173540;border:1px solid var(--sea-line);
-    border-radius:999px;padding:6px 11px;cursor:pointer;touch-action:manipulation}
+  .chatbar{margin-top:14px;background:var(--panel);border:2px solid var(--line);border-radius:14px;padding:9px}
+  .stamps{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-bottom:8px}
+  .stamp{font-family:var(--font-body);font-weight:800;font-size:14px;color:var(--blue-d);background:#eaf5fc;border:2px solid #bfe0f2;border-radius:999px;padding:7px 13px;cursor:pointer;touch-action:manipulation}
   .stamp:active{transform:translateY(1px)}
-  .chatrow{display:flex;gap:7px}
-  .chatrow input{flex:1;padding:10px 12px;border-radius:9px;border:1px solid var(--sea-line);background:#0c222c;color:var(--foam);font-size:16px;font-family:var(--font-body);font-weight:700}
+  .chatrow{display:flex;gap:8px}
+  .chatrow input{flex:1;padding:12px;border-radius:11px;border:2px solid var(--line);background:#fffdf8;color:var(--ink);font-size:17px;font-family:var(--font-body);font-weight:800}
 
-  .note{margin-top:14px;font-size:11px;color:#7f93a0;line-height:1.6;text-align:center}
-  .overlay{position:fixed;inset:0;background:rgba(6,14,20,.72);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .note{margin-top:14px;font-size:12px;color:var(--ink-soft);line-height:1.6;text-align:center;font-weight:700}
+  .overlay{position:fixed;inset:0;background:rgba(40,30,15,.55);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
   .overlay.hidden{display:none}
-  .ov-box{background:linear-gradient(180deg,#153a49,#0e2833);border:1px solid var(--sea-line);border-radius:14px;padding:22px 26px;text-align:center;font-family:var(--font-display);font-weight:800;font-size:20px;color:var(--brass-light);max-width:300px}
-  .ov-sub{font-family:var(--font-body);font-weight:700;font-size:12px;color:var(--parchment-dark);margin-top:8px;line-height:1.5}
+  .ov-box{background:var(--panel);border:2px solid var(--brass);border-radius:16px;padding:24px 28px;text-align:center;font-family:var(--font-display);font-weight:900;font-size:22px;color:#d64b3e;max-width:320px;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+  .ov-sub{font-family:var(--font-body);font-weight:800;font-size:14px;color:var(--ink-soft);margin-top:10px;line-height:1.5}
   .hidden{display:none}
-  @media(max-width:430px){ h1{font-size:34px} .board{max-width:100%} }
   @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 
 <div class="board">
   <header>
     <div class="compass">&#10022;</div>
-    <h1>海賊じゃんけん</h1>
-    <div class="subtitle">Pirate Janken &mdash; 対戦</div>
+    <h1>パイレーツオブじゃんけん</h1>
+    <div class="subtitle">Pirates of Janken</div>
   </header>
 
-  <!-- ロビー -->
   <div id="lobby">
     <div class="lobby-card">
       <label>ニックネーム</label>
       <input id="name" maxlength="12" placeholder="なまえ">
-      <label>キャラの色（バンダナ）</label>
-      <div class="swatches" id="colors"></div>
+      <label>キャラを選ぶ</label>
+      <div class="chars" id="chars"></div>
       <div class="stat-line" id="stat-line"></div>
       <div class="modes">
-        <button class="btn primary wide" id="auto">自動でマッチ（ランダムな相手）</button>
-        <button class="btn ghost wide" id="create">友達と部屋を作る</button>
+        <button class="btn primary wide" id="auto">自動でマッチ</button>
+        <button class="btn blue wide" id="create">友達と部屋を作る</button>
         <label>部屋コードで参加</label>
-        <div class="code-row">
-          <input id="code" maxlength="4" placeholder="ABCD">
-          <button class="btn ghost" id="join">参加</button>
-        </div>
+        <div class="code-row"><input id="code" maxlength="4" placeholder="ABCD"><button class="btn blue" id="join">参加</button></div>
       </div>
       <div class="lobby-err" id="lobby-err"></div>
     </div>
   </div>
 
-  <!-- ゲーム -->
   <div id="game" class="hidden">
     <div class="timer hidden" id="timer">アクションまで <b id="time-left">20</b> 秒</div>
     <div class="arena-wrap">
       <div class="arena stage" id="arena"></div>
+      <div class="flash hidden" id="flash"></div>
       <div class="bubble you hidden" id="bubble-you"></div>
       <div class="bubble opp hidden" id="bubble-opp"></div>
     </div>
@@ -239,16 +230,14 @@
     </div>
     <div class="panels">
       <div class="panel you">
-        <div class="who">あなた</div>
-        <div class="pname" id="you-name">あなた</div>
+        <div class="who">あなた</div><div class="pname" id="you-name">あなた</div>
         <div><span class="title-tag" id="you-title">見習い</span></div>
         <div class="star-line" id="you-star"></div>
         <div class="record"><span class="crown">&#128081;</span> <span id="you-rec">0勝0敗</span></div>
         <div class="strength">強さ：<span class="num" id="you-str">1500</span><span class="delta" id="you-delta"></span></div>
       </div>
       <div class="panel opp">
-        <div class="who">相手</div>
-        <div class="pname" id="opp-name">&mdash;</div>
+        <div class="who">相手</div><div class="pname" id="opp-name">&mdash;</div>
         <div><span class="title-tag" id="opp-title">&mdash;</span></div>
         <div class="star-line" id="opp-star"></div>
         <div class="record"><span class="crown">&#128081;</span> <span id="opp-rec">0勝0敗</span></div>
@@ -259,19 +248,23 @@
     <div class="actions" id="actions"></div>
     <div class="chatbar">
       <div class="stamps" id="stamps"></div>
-      <div class="chatrow"><input id="chat-input" maxlength="40" placeholder="メッセージ…"><button class="btn ghost" id="chat-send">送信</button></div>
+      <div class="chatrow"><input id="chat-input" maxlength="40" placeholder="メッセージ…"><button class="btn blue" id="chat-send">送信</button></div>
     </div>
-    <div class="note">勝敗は★の合計が多いほうの勝ち（ノーマル勝ち+1／★でノーマル勝ち+2／★同士勝ち+3・負けても減らない）。強さは勝ち+16・負け-16。成績はこの端末に保存されます。</div>
+    <div class="note">勝敗は★の合計が多いほうの勝ち（ノーマル勝ち+1／★でノーマル勝ち+2／★同士勝ち+3）。強さは勝ち+16・負け-16。成績はこの端末に保存されます。</div>
   </div>
 </div>
 
 <div id="reconnect-ov" class="overlay hidden"><div class="ov-box">再接続中…<div class="ov-sub">通信が切れました。戻しています。<br>少し待ってね</div></div></div>
 <div id="pause-ov" class="overlay hidden"><div class="ov-box">相手が離れています<div class="ov-sub">接続が切れたみたい。<br>戻ってくるのを待っています…</div></div></div>
-<div id="search-ov" class="overlay hidden"><div class="ov-box">対戦相手を探しています…<div class="ov-sub">見つかると自動で始まります</div><button class="btn ghost" id="cancel-search" style="margin-top:14px">やめる</button></div></div>
+<div id="search-ov" class="overlay hidden"><div class="ov-box">対戦相手を探しています…<div class="ov-sub">見つかると自動で始まります</div><button class="btn blue" id="cancel-search" style="margin-top:16px">やめる</button></div></div>
 
 <script>
 const HANDS = { goo:{name:"グー",emoji:"\u270A"}, choki:{name:"チョキ",emoji:"\u270C\uFE0F"}, paa:{name:"パー",emoji:"\u270B"} };
-const COLORS = ["#2f6d86","#a8496a","#4f8a54","#c9863a","#7a5aa8","#33373f"];
+const COLORS = ["#4aa3cf","#e67aa0","#4f8a54","#e0952f","#7a5aa8","#33373f"];
+const CHARS = [
+  {id:"1",name:"海賊王"},{id:"2",name:"荒くれ"},{id:"3",name:"船長"},{id:"4",name:"女海賊"},{id:"5",name:"航海士"},
+  {id:"6",name:"提督"},{id:"7",name:"将軍"},{id:"8",name:"少年"},{id:"9",name:"コック"},{id:"10",name:"新米"}
+];
 const STAMPS = ["よろしく！","いくよ！","やった！","うぐぐ…","ナイス！","またね！"];
 const TITLE_BANDS = [
   {min:2000,name:"海賊王"},{min:1900,name:"大海賊"},{min:1800,name:"賞金首"},
@@ -283,31 +276,24 @@ function titleFor(str,games){ if(games<3) return "見習い"; for(const b of TIT
 function starIcons(n){ if(n<=0) return '<span class="starzero">\u2605 0</span>'; const cap=Math.min(n,10); return '\u2605'.repeat(cap)+(n>10?'<span class="starcount"> \u00d7'+n+'</span>':''); }
 const el = id => document.getElementById(id);
 
-/* ===== 端末に保存するプロフィール・成績 ===== */
-function loadProfile(){
-  let d={name:"",color:"#2f6d86",strength:1500,games:0,mwins:0,mlosses:0};
-  try{ const s=JSON.parse(localStorage.getItem("kj_profile")||"null"); if(s) d=Object.assign(d,s); }catch(e){}
-  return d;
-}
+function loadProfile(){ let d={name:"",color:"#4aa3cf",char:"1",strength:1500,games:0,mwins:0,mlosses:0};
+  try{ const s=JSON.parse(localStorage.getItem("kj_profile")||"null"); if(s) d=Object.assign(d,s); }catch(e){} return d; }
 let P = loadProfile();
 function saveProfile(){ try{ localStorage.setItem("kj_profile", JSON.stringify(P)); }catch(e){} }
 function updateStats(){ el("stat-line").innerHTML = "通算 "+P.mwins+"勝"+P.mlosses+"敗 ・ 強さ "+P.strength+" ・ 称号 <b>"+titleFor(P.strength,P.games)+"</b>"; }
-function profileMsg(){ return {name:P.name||"海賊", color:P.color, strength:P.strength, games:P.games, mwins:P.mwins, mlosses:P.mlosses}; }
+function profileMsg(){ return {name:P.name||"海賊", color:P.color, char:P.char, strength:P.strength, games:P.games, mwins:P.mwins, mlosses:P.mlosses}; }
 
-// ロビー初期化
 el("name").value = P.name;
-el("colors").innerHTML = COLORS.map(c=>'<button class="swatch" data-c="'+c+'" style="background:'+c+'"></button>').join("");
-function refreshColors(){ el("colors").querySelectorAll(".swatch").forEach(b=>b.classList.toggle("sel", b.dataset.c===P.color)); }
-el("colors").querySelectorAll(".swatch").forEach(b=> b.onclick=()=>{ P.color=b.dataset.c; saveProfile(); refreshColors(); });
-refreshColors(); updateStats();
+el("chars").innerHTML = CHARS.map(c=>'<button class="charpick" data-c="'+c.id+'"><img src="/img/'+c.id+'.png" alt=""><span>'+c.name+'</span></button>').join("");
+function refreshChars(){ el("chars").querySelectorAll(".charpick").forEach(b=>b.classList.toggle("sel", b.dataset.c===P.char)); }
+el("chars").querySelectorAll(".charpick").forEach(b=> b.onclick=()=>{ P.char=b.dataset.c; saveProfile(); refreshChars(); });
+refreshChars(); updateStats();
 el("name").addEventListener("input", ()=>{ P.name=el("name").value.trim(); });
 el("stamps").innerHTML = STAMPS.map((s,i)=>'<button class="stamp" data-i="'+i+'">'+s+'</button>').join("");
 el("stamps").querySelectorAll(".stamp").forEach(b=> b.onclick=()=> send({t:"chat", text:STAMPS[b.dataset.i]}) );
 
-/* ===== 接続 ===== */
-let ws=null, S=null, myIndex=0, myCode="", myToken=null,
-    localPicked=false, pickTimer=null, heartbeat=null, reconnectTimer=null,
-    joinedGame=false, reconnecting=false;
+let ws=null, S=null, myIndex=0, myCode="", myToken=null, localPicked=false, pickTimer=null,
+    heartbeat=null, reconnectTimer=null, joinedGame=false, reconnecting=false;
 function send(o){ if(ws && ws.readyState===1) ws.send(JSON.stringify(o)); }
 function showOverlay(id){ el(id).classList.remove("hidden"); }
 function hideOverlay(id){ el(id).classList.add("hidden"); }
@@ -315,8 +301,7 @@ function hideOverlay(id){ el(id).classList.add("hidden"); }
 function openWS(onOpenSend){
   if(ws){ try{ ws.onclose=null; ws.onerror=null; ws.close(); }catch(e){} }
   const proto = location.protocol==="https:" ? "wss" : "ws";
-  try{ ws = new WebSocket(proto+"://"+location.host+"/ws"); }
-  catch(e){ if(joinedGame) scheduleReconnect(); return; }
+  try{ ws = new WebSocket(proto+"://"+location.host+"/ws"); }catch(e){ if(joinedGame) scheduleReconnect(); return; }
   ws.onopen = ()=>{ onOpenSend(); startHeartbeat(); };
   ws.onmessage = e=> handle(JSON.parse(e.data));
   ws.onclose = ()=>{ stopHeartbeat(); if(joinedGame) scheduleReconnect(); };
@@ -324,7 +309,6 @@ function openWS(onOpenSend){
 }
 function startHeartbeat(){ stopHeartbeat(); heartbeat=setInterval(()=>send({t:"ping"}), 25000); }
 function stopHeartbeat(){ if(heartbeat){ clearInterval(heartbeat); heartbeat=null; } }
-
 function saveName(){ P.name = el("name").value.trim() || "海賊"; saveProfile(); }
 function doAuto(){ saveName(); openWS(()=>{ showOverlay("search-ov"); send(Object.assign({t:"quickmatch"}, profileMsg())); }); }
 function doCreate(){ saveName(); myCode=""; openWS(()=>{ send(Object.assign({t:"join", room:""}, profileMsg())); }); }
@@ -332,31 +316,21 @@ function doJoin(){ const c=el("code").value.trim().toUpperCase(); if(!c){ el("lo
 function reconnectSend(){ send(Object.assign({t:"join", room:myCode, token:myToken}, profileMsg())); }
 el("auto").onclick=doAuto; el("create").onclick=doCreate; el("join").onclick=doJoin;
 el("cancel-search").onclick=()=>{ send({t:"cancel_match"}); hideOverlay("search-ov"); if(ws){ ws.onclose=null; try{ws.close();}catch(e){} } };
-
 function scheduleReconnect(){ if(reconnecting||!joinedGame) return; reconnecting=true; showOverlay("reconnect-ov"); attemptReconnect(); }
 function attemptReconnect(){ if(!reconnecting) return; openWS(reconnectSend); reconnectTimer=setTimeout(()=>{ if(reconnecting) attemptReconnect(); }, 3500); }
 function stopReconnect(){ reconnecting=false; if(reconnectTimer){ clearTimeout(reconnectTimer); reconnectTimer=null; } hideOverlay("reconnect-ov"); }
-
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && joinedGame && (!ws||ws.readyState>1)) scheduleReconnect(); });
 window.addEventListener("online", ()=>{ if(joinedGame && (!ws||ws.readyState>1)) scheduleReconnect(); });
 
-/* チャット送信 */
 function sendChat(){ const v=el("chat-input").value.trim(); if(!v) return; send({t:"chat", text:v}); el("chat-input").value=""; }
 el("chat-send").onclick=sendChat;
 el("chat-input").addEventListener("keydown", e=>{ if(e.key==="Enter") sendChat(); });
-function showBubble(side, text){
-  const b=el("bubble-"+side); b.textContent=text; b.classList.remove("hidden");
-  b.style.animation="none"; void b.offsetWidth; b.style.animation="";
-  clearTimeout(b._t); b._t=setTimeout(()=>b.classList.add("hidden"), 4000);
-}
+function showBubble(side, text){ const b=el("bubble-"+side); b.textContent=text; b.classList.remove("hidden");
+  b.style.animation="none"; void b.offsetWidth; b.style.animation=""; clearTimeout(b._t); b._t=setTimeout(()=>b.classList.add("hidden"), 4000); }
 
-/* ===== メッセージ処理 ===== */
 function handle(m){
-  if(m.t==="joined"){
-    myIndex=m.you; myCode=m.code; myToken=m.token; joinedGame=true;
-    hideOverlay("search-ov");
-    el("lobby").classList.add("hidden"); el("game").classList.remove("hidden"); stopReconnect();
-  }
+  if(m.t==="joined"){ myIndex=m.you; myCode=m.code; myToken=m.token; joinedGame=true; hideOverlay("search-ov");
+    el("lobby").classList.add("hidden"); el("game").classList.remove("hidden"); stopReconnect(); }
   else if(m.t==="searching"){ showOverlay("search-ov"); }
   else if(m.t==="match_cancelled"){ hideOverlay("search-ov"); }
   else if(m.t==="error"){ el("lobby-err").textContent=m.msg; joinedGame=false; hideOverlay("search-ov"); if(ws){ ws.onclose=null; ws.close(); } }
@@ -370,192 +344,95 @@ function handle(m){
   else if(m.t==="opp_paused"){ showOverlay("pause-ov"); }
   else if(m.t==="opp_resumed"){ hideOverlay("pause-ov"); }
   else if(m.t==="opp_left"){ hideOverlay("pause-ov"); el("banner").textContent="相手が退出しました"; }
-  else if(m.t==="pong"){ /* alive */ }
+  else if(m.t==="pong"){ }
 }
-
 function onState(){
   if(!S) return;
-  // reveal中は「使用済み」や★を先に見せない（演出のあとで反映）
   if(S.phase!=="reveal"){ renderPanels(); renderTrays(); }
   const a=el("actions");
   if(S.phase==="lobby"){ showWaiting(); a.innerHTML=""; }
   else if(S.phase==="ready"){ showReadyScreen(); a.innerHTML=""; }
-  else if(S.phase==="playing" || S.phase==="reveal"){
-    a.innerHTML='<button class="btn surrender" id="give-up">\uD83C\uDFF3\uFE0F 降参する</button>';
-    el("give-up").onclick=()=>send({t:"surrender"});
-  }
-  el("you-label").textContent=S.you.name;
-  el("opp-label").textContent=S.opp?S.opp.name:"相手";
+  else if(S.phase==="playing" || S.phase==="reveal"){ a.innerHTML='<button class="btn surrender" id="give-up">\uD83C\uDFF3\uFE0F 降参する</button>'; el("give-up").onclick=()=>send({t:"surrender"}); }
+  el("you-label").textContent=S.you.name; el("opp-label").textContent=S.opp?S.opp.name:"相手";
 }
-
-/* ===== 画面 ===== */
 function showTimer(on){ el("timer").classList.toggle("hidden", !on); }
 function setTimeLeft(n){ el("time-left").textContent=Math.max(0,n); el("timer").classList.toggle("warn", n<=5); }
 function startPickTimer(){ stopPickTimer(); let left=20; setTimeLeft(left); showTimer(true); pickTimer=setInterval(()=>{ left--; setTimeLeft(left); if(left<=0) stopPickTimer(); },1000); }
 function stopPickTimer(){ if(pickTimer){ clearInterval(pickTimer); pickTimer=null; } }
+function showWaiting(){ const arena=el("arena"); arena.className="arena stage";
+  arena.innerHTML = tavernBG()+'<div class="wait-box"><div class="wait-title">友達を待っています…</div><div class="wait-code">部屋コード <b>'+myCode+'</b></div><div class="wait-hint">このコードを友達に伝えて、同じコードで入ってもらってね</div></div>';
+  showTimer(false); el("banner").textContent=""; }
+function showReadyScreen(){ const arena=el("arena"); arena.className="arena stage"; const youReady=S.you.ready, oppReady=S.opp&&S.opp.ready;
+  arena.innerHTML = tavernBG()+'<div class="ready-screen"><div class="rules-card"><div class="rt">\u2694 ゲームルール \u2694</div>'+
+    '<ul><li>じゃんけん5回勝負</li><li>最後に\u2605が多いほうが勝ち</li><li>ノーマルで勝つと \u2605+1</li><li>\u2605の手でノーマルに勝つと +2</li><li>\u2605同士で勝つと +3</li><li>一度使った手は使えない</li></ul>'+
+    '<div class="ready-row"><span class="ready-badge '+(youReady?"ok":"wait")+'">あなた：'+(youReady?"準備OK!":"準備中")+'</span><span class="ready-badge '+(oppReady?"ok":"wait")+'">'+(S.opp?S.opp.name:"相手")+'：'+(oppReady?"準備OK!":"準備中")+'</span></div>'+
+    (youReady?'<div class="waiting-small">相手を待っています…</div>':'<button class="btn primary" id="ready-btn">準備OK!!</button>')+'</div></div>';
+  if(!youReady){ el("ready-btn").onclick=()=>send({t:"ready"}); } showTimer(false); el("banner").textContent=""; }
+function onRoundStart(round, first){ localPicked=false; const seq=[]; if(first) seq.push({text:"ゲームスタート",cls:"start"});
+  seq.push({text:(round>=5?"Final Round":"Round"+round),cls:"round"}); showBanner(seq, ()=>{ idlePickStage(); renderTrays(); startPickTimer(); }); }
+function colorYou(){ return (S&&S.you&&S.you.color)||"#4aa3cf"; }
+function colorOpp(){ return (S&&S.opp&&S.opp.color)||"#e67aa0"; }
+function idlePickStage(){ const arena=el("arena"); arena.className="arena stage";
+  arena.innerHTML = tavernBG()+fighterHTML("you", S.you.name)+'<div class="verdict-slot"><div class="prompt">第'+S.round+'回戦<br>手を選ぼう</div></div>'+fighterHTML("opp", S.opp?S.opp.name:"相手"); }
+function showBanner(seq, done){ const arena=el("arena"); arena.className="arena stage"; let i=0;
+  (function next(){ if(i>=seq.length){ done&&done(); return; } arena.innerHTML = tavernBG()+'<div class="round-banner '+(seq[i].cls||"")+'">'+seq[i].text+'</div>'; i++; setTimeout(next, 950); })(); }
+function onPick(i){ if(!S||S.phase!=="playing"||localPicked) return; localPicked=true; send({t:"pick", index:i}); renderTrays(); const pr=document.querySelector(".prompt"); if(pr) pr.innerHTML="相手を待っています…"; }
 
-function showWaiting(){
-  const arena=el("arena"); arena.className="arena stage";
-  arena.innerHTML = tavernBG()+
-    '<div class="wait-box"><div class="wait-title">友達を待っています…</div>'+
-    '<div class="wait-code">部屋コード <b>'+myCode+'</b></div>'+
-    '<div class="wait-hint">このコードを友達に伝えて、同じコードで入ってもらってね</div></div>';
-  showTimer(false); el("banner").textContent="";
-}
-function showReadyScreen(){
-  const arena=el("arena"); arena.className="arena stage";
-  const youReady=S.you.ready, oppReady=S.opp && S.opp.ready;
-  arena.innerHTML = tavernBG()+
-    '<div class="ready-screen"><div class="rules-card">'+
-      '<div class="rt">\u2694 ゲームルール \u2694</div>'+
-      '<ul><li>じゃんけん5回勝負</li><li>最後に\u2605が多いほうが勝ち</li><li>ノーマルで勝つと \u2605+1</li>'+
-      '<li>\u2605の手でノーマルに勝つと +2</li><li>\u2605同士で勝つと +3</li><li>一度使った手は使えない</li></ul>'+
-      '<div class="ready-row">'+
-        '<span class="ready-badge '+(youReady?"ok":"wait")+'">あなた：'+(youReady?"準備OK!":"準備中")+'</span>'+
-        '<span class="ready-badge '+(oppReady?"ok":"wait")+'">'+(S.opp?S.opp.name:"相手")+'：'+(oppReady?"準備OK!":"準備中")+'</span>'+
-      '</div>'+
-      (youReady?'<div class="waiting-small">相手を待っています…</div>':'<button class="btn primary" id="ready-btn">準備OK!!</button>')+
-    '</div></div>';
-  if(!youReady){ el("ready-btn").onclick=()=>send({t:"ready"}); }
-  showTimer(false); el("banner").textContent="";
-}
-
-function onRoundStart(round, first){
-  localPicked=false;
-  const seq=[];
-  if(first) seq.push({text:"ゲームスタート",cls:"start"});
-  seq.push({text:(round>=5?"Final Round":"Round"+round),cls:"round"});
-  showBanner(seq, ()=>{ idlePickStage(); renderTrays(); startPickTimer(); });
-}
-function colorYou(){ return (S && S.you && S.you.color) || "#2f6d86"; }
-function colorOpp(){ return (S && S.opp && S.opp.color) || "#a8496a"; }
-function idlePickStage(){
-  const arena=el("arena"); arena.className="arena stage";
-  arena.innerHTML = tavernBG()+
-    fighterHTML("you", colorYou(), S.you.name)+
-    '<div class="verdict-slot"><div class="prompt">第'+S.round+'回戦<br>手を選ぼう</div></div>'+
-    fighterHTML("opp", colorOpp(), S.opp?S.opp.name:"相手");
-}
-function showBanner(seq, done){
-  const arena=el("arena"); arena.className="arena stage"; let i=0;
-  (function next(){ if(i>=seq.length){ done&&done(); return; }
-    arena.innerHTML = tavernBG()+'<div class="round-banner '+(seq[i].cls||"")+'">'+seq[i].text+'</div>'; i++; setTimeout(next, 950);
-  })();
-}
-function onPick(i){
-  if(!S || S.phase!=="playing" || localPicked) return;
-  localPicked=true; send({t:"pick", index:i}); renderTrays();
-  const pr=document.querySelector(".prompt"); if(pr) pr.innerHTML="相手を待っています…";
-}
-
-/* ===== 手札・パネル ===== */
-function renderTray(id, deck, isOpp){
-  const tray=el(id); tray.innerHTML="";
-  (deck||[]).forEach((c,i)=>{
-    const d=document.createElement("div");
-    d.className="card"+(isOpp?" cpu":"")+(c.used?" used":"");
+function renderTray(id, deck, isOpp){ const tray=el(id); tray.innerHTML="";
+  (deck||[]).forEach((c,i)=>{ const d=document.createElement("div"); d.className="card"+(isOpp?" cpu":"")+(c.used?" used":"");
     d.innerHTML=(c.star?'<span class="star">\u2605</span>':"")+'<span class="emoji">'+HANDS[c.type].emoji+'</span><span class="name">'+HANDS[c.type].name+'</span>';
-    if(!isOpp && S.phase==="playing" && !localPicked && !c.used) d.onclick=()=>onPick(i);
-    tray.appendChild(d);
-  });
-}
+    if(!isOpp && S.phase==="playing" && !localPicked && !c.used) d.onclick=()=>onPick(i); tray.appendChild(d); }); }
 function renderTrays(){ if(!S) return; renderTray("you-tray", S.you.deck, false); renderTray("opp-tray", S.opp?S.opp.deck:[], true); }
-function renderPanels(){
-  if(!S) return; const y=S.you, o=S.opp;
-  el("you-name").textContent=y.name; el("you-title").textContent=titleFor(y.strength,y.games);
-  el("you-star").innerHTML=starIcons(y.star); el("you-rec").textContent=y.mwins+"勝"+y.mlosses+"敗"; el("you-str").textContent=y.strength;
-  el("opp-name").textContent=o?o.name:"\u2014"; el("opp-title").textContent=o?titleFor(o.strength,o.games):"\u2014";
-  el("opp-star").innerHTML=o?starIcons(o.star):""; el("opp-rec").textContent=o?(o.mwins+"勝"+o.mlosses+"敗"):"0勝0敗"; el("opp-str").textContent=o?o.strength:"\u2014";
-}
+function renderPanels(){ if(!S) return; const y=S.you, o=S.opp;
+  el("you-name").textContent=y.name; el("you-title").textContent=titleFor(y.strength,y.games); el("you-star").innerHTML=starIcons(y.star);
+  el("you-rec").textContent=y.mwins+"勝"+y.mlosses+"敗"; el("you-str").textContent=y.strength;
+  el("opp-name").textContent=o?o.name:"\u2014"; el("opp-title").textContent=o?titleFor(o.strength,o.games):"\u2014"; el("opp-star").innerHTML=o?starIcons(o.star):"";
+  el("opp-rec").textContent=o?(o.mwins+"勝"+o.mlosses+"敗"):"0勝0敗"; el("opp-str").textContent=o?o.strength:"\u2014"; }
 function showDelta(id,d){ const e=el(id); if(!d){ e.textContent=""; return; } e.textContent=(d>0?"+":"")+d; e.className="delta "+(d>0?"up":"down"); }
 
-/* ===== アバター・演出 ===== */
-function pirateSVG(color){
-  return '<svg class="pirate" viewBox="0 0 80 92" xmlns="http://www.w3.org/2000/svg">'+
-    '<ellipse cx="40" cy="74" rx="21" ry="15" fill="#3a2c1e"/>'+
-    '<rect x="30" y="58" width="20" height="16" rx="6" fill="#f0c9a0"/>'+
-    '<circle cx="40" cy="42" r="18" fill="#f2cba2"/>'+
-    '<path d="M21 36 Q40 20 59 36 L59 31 Q40 15 21 31 Z" fill="'+color+'"/>'+
-    '<rect x="21" y="31" width="38" height="7" rx="3" fill="'+color+'"/>'+
-    '<path d="M19 35 l-9 3 7 5 z" fill="'+color+'"/>'+
-    '<circle cx="34" cy="44" r="2.6" fill="#2a2016"/>'+
-    '<rect x="43" y="41" width="9" height="6" rx="2" fill="#241a10"/>'+
-    '<line x1="47" y1="35" x2="53" y2="47" stroke="#241a10" stroke-width="1.6"/>'+
-    '<path d="M34 52 Q40 56 46 52" stroke="#8a3b2b" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
-}
-function matSVG(){
-  return '<svg class="mat" viewBox="0 0 90 30" xmlns="http://www.w3.org/2000/svg">'+
-    '<ellipse cx="45" cy="15" rx="44" ry="14" fill="#7a2f22"/><ellipse cx="45" cy="15" rx="37" ry="11" fill="#9a3f2c"/>'+
-    '<polygon points="45,3 47,15 45,27 43,15" fill="#eac079"/><polygon points="6,15 45,13 84,15 45,17" fill="#eac079"/>'+
-    '<circle cx="45" cy="15" r="2.4" fill="#5e241a"/></svg>';
-}
+function pirateSVG(color){ return '<svg class="pirate" viewBox="0 0 80 92" xmlns="http://www.w3.org/2000/svg">'+
+  '<ellipse cx="40" cy="74" rx="21" ry="15" fill="#3a2c1e"/><rect x="30" y="58" width="20" height="16" rx="6" fill="#f0c9a0"/><circle cx="40" cy="42" r="18" fill="#f2cba2"/>'+
+  '<path d="M21 36 Q40 20 59 36 L59 31 Q40 15 21 31 Z" fill="'+color+'"/><rect x="21" y="31" width="38" height="7" rx="3" fill="'+color+'"/><path d="M19 35 l-9 3 7 5 z" fill="'+color+'"/>'+
+  '<circle cx="34" cy="44" r="2.6" fill="#2a2016"/><rect x="43" y="41" width="9" height="6" rx="2" fill="#241a10"/><line x1="47" y1="35" x2="53" y2="47" stroke="#241a10" stroke-width="1.6"/>'+
+  '<path d="M34 52 Q40 56 46 52" stroke="#8a3b2b" stroke-width="2" fill="none" stroke-linecap="round"/></svg>'; }
+function matSVG(){ return '<svg class="mat" viewBox="0 0 90 30" xmlns="http://www.w3.org/2000/svg"><ellipse cx="45" cy="15" rx="44" ry="14" fill="#7a2f22"/><ellipse cx="45" cy="15" rx="37" ry="11" fill="#9a3f2c"/><polygon points="45,3 47,15 45,27 43,15" fill="#eac079"/><polygon points="6,15 45,13 84,15 45,17" fill="#eac079"/><circle cx="45" cy="15" r="2.4" fill="#5e241a"/></svg>'; }
 function barrelsRow(){ let s=""; for(let x=4;x<300;x+=32){ s+='<g transform="translate('+x+',12)"><rect x="0" y="0" width="24" height="30" rx="7" fill="#7c4c26" stroke="#4e2c14" stroke-width="1"/><rect x="-1" y="8" width="26" height="3" fill="#c98b3a"/><rect x="-1" y="20" width="26" height="3" fill="#c98b3a"/></g>'; } return s; }
-function tavernBG(){
-  return '<svg class="tavern-bg" viewBox="0 0 300 150" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">'+
-    '<rect x="0" y="0" width="300" height="150" fill="#b98a52"/><rect x="0" y="0" width="300" height="50" fill="#3a2412"/>'+barrelsRow()+
-    '<rect x="0" y="48" width="300" height="4" fill="#5a3a1e"/>'+
-    '<g stroke="#9c7038" stroke-width="1" opacity=".45"><line x1="150" y1="52" x2="10" y2="150"/><line x1="150" y1="52" x2="95" y2="150"/><line x1="150" y1="52" x2="205" y2="150"/><line x1="150" y1="52" x2="290" y2="150"/></g></svg>';
-}
-function fighterHTML(side,color,name){
-  return '<div class="fighter '+side+'"><div class="cap">'+name+'</div>'+
-    '<div class="pick-card" id="'+side+'-pick"></div>'+
-    '<div class="hand-anim" id="'+side+'-hand">\u270A</div>'+
-    '<div class="avatar">'+pirateSVG(color)+'</div>'+matSVG()+'</div>';
-}
-function setPick(id, card){
-  const e=el(id); if(!e) return;
-  e.innerHTML='<div class="box">'+(card.star?'<span class="st">\u2605</span>':"")+'<span class="e">'+HANDS[card.type].emoji+'</span><span class="n">'+HANDS[card.type].name+'</span></div>';
-  e.classList.add("show");
-}
-function sparkle(container, hand){
-  hand.classList.add("star-glow"); const marks=["\u2728","\u2605","\u2727","\u2728","\u2605","\u2727"];
-  for(let k=0;k<6;k++){ const s=document.createElement("span"); s.className="spark"; s.textContent=marks[k];
-    s.style.left=(25+Math.random()*50)+"%"; s.style.top=(Math.random()*55)+"%"; s.style.animationDelay=(Math.random()*0.3)+"s"; container.appendChild(s); }
-}
-function confetti(container){
-  const colors=["#f2c14e","#e0553b","#4f9d69","#3f7fbf","#ecc981","#e98cb0","#7fbf7f"];
-  for(let i=0;i<40;i++){ const p=document.createElement("span"); p.className="confetti";
-    p.style.left=Math.random()*100+"%"; p.style.background=colors[i%colors.length]; p.style.animationDelay=(Math.random()*0.35)+"s";
-    p.style.animationDuration=(1.1+Math.random()*0.9)+"s"; p.style.width=(5+Math.random()*5)+"px"; p.style.height=(8+Math.random()*6)+"px"; container.appendChild(p); }
-  setTimeout(()=>{ container.querySelectorAll(".confetti").forEach(e=>e.remove()); },2800);
-}
+function tavernBG(){ return '<svg class="tavern-bg" viewBox="0 0 300 150" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="300" height="150" fill="#b98a52"/><rect x="0" y="0" width="300" height="50" fill="#3a2412"/>'+barrelsRow()+'<rect x="0" y="48" width="300" height="4" fill="#5a3a1e"/><g stroke="#9c7038" stroke-width="1" opacity=".45"><line x1="150" y1="52" x2="10" y2="150"/><line x1="150" y1="52" x2="95" y2="150"/><line x1="150" y1="52" x2="205" y2="150"/><line x1="150" y1="52" x2="290" y2="150"/></g></svg>'; }
+function charFor(side){ if(side==="you") return (S&&S.you&&S.you.char)||"1"; return (S&&S.opp&&S.opp.char)||"2"; }
+function fighterHTML(side,name){ const c=charFor(side); return '<div class="fighter '+side+'"><div class="cap">'+name+'</div><div class="pick-card" id="'+side+'-pick"></div><div class="hand-anim" id="'+side+'-hand">\u270A</div><div class="avatar"><img class="ava'+(side==="opp"?" flip":"")+'" src="/img/'+c+'.png" alt=""></div>'+matSVG()+'</div>'; }
+function setPick(id, card){ const e=el(id); if(!e) return; e.innerHTML='<div class="box">'+(card.star?'<span class="st">\u2605</span>':"")+'<span class="e">'+HANDS[card.type].emoji+'</span><span class="n">'+HANDS[card.type].name+'</span></div>'; e.classList.add("show"); }
+function sparkle(container, hand){ hand.classList.add("star-glow"); const marks=["\u2728","\u2605","\u2727","\uD83C\uDF1F","\u2728","\u2605","\u2727","\uD83C\uDF1F","\u2728","\u2605"];
+  for(let k=0;k<10;k++){ const s=document.createElement("span"); s.className="spark"; s.textContent=marks[k]; s.style.left=(15+Math.random()*70)+"%"; s.style.top=(Math.random()*70)+"%"; s.style.animationDelay=(Math.random()*0.35)+"s"; container.appendChild(s); } }
+function confetti(container){ const colors=["#ffbe1a","#e0553b","#4f9d69","#3f7fbf","#ecc981","#e98cb0","#7fbf7f","#ff7b95","#68b6e6"];
+  for(let i=0;i<75;i++){ const p=document.createElement("span"); p.className="confetti"; p.style.left=Math.random()*100+"%"; p.style.background=colors[i%colors.length];
+    p.style.animationDelay=(Math.random()*0.4)+"s"; p.style.animationDuration=(1.1+Math.random()*1.1)+"s"; p.style.width=(6+Math.random()*7)+"px"; p.style.height=(10+Math.random()*8)+"px"; container.appendChild(p); }
+  setTimeout(()=>{ container.querySelectorAll(".confetti").forEach(e=>e.remove()); },3200); }
+function flash(){ const f=el("flash"); f.classList.remove("hidden"); f.style.animation="none"; void f.offsetWidth; f.style.animation=""; clearTimeout(f._t); f._t=setTimeout(()=>f.classList.add("hidden"), 600); }
 function animateRound(you, opp, result, done){
   const arena=el("arena"); arena.className="arena stage";
-  arena.innerHTML = tavernBG()+ fighterHTML("you", colorYou(), S.you.name)+
-    '<div class="verdict-slot" id="verdict-slot"></div>'+ fighterHTML("opp", colorOpp(), S.opp?S.opp.name:"相手");
+  arena.innerHTML = tavernBG()+fighterHTML("you", S.you.name)+'<div class="verdict-slot" id="verdict-slot"></div>'+fighterHTML("opp", S.opp?S.opp.name:"相手");
   const yh=el("you-hand"), oh=el("opp-hand"), slot=el("verdict-slot");
   yh.classList.add("shaking"); oh.classList.add("shaking");
   let n=3; slot.innerHTML='<div class="count-num">'+n+'</div>';
   const cd=setInterval(()=>{ n--;
     if(n>=1){ slot.innerHTML='<div class="count-num">'+n+'</div>'; }
-    else{ clearInterval(cd);
-      yh.classList.remove("shaking"); oh.classList.remove("shaking");
-      yh.textContent=HANDS[you.type].emoji; oh.textContent=HANDS[opp.type].emoji;
-      yh.classList.add("pop"); oh.classList.add("pop");
+    else{ clearInterval(cd); yh.classList.remove("shaking"); oh.classList.remove("shaking");
+      yh.textContent=HANDS[you.type].emoji; oh.textContent=HANDS[opp.type].emoji; yh.classList.add("pop"); oh.classList.add("pop");
       setPick("you-pick", you); setPick("opp-pick", opp);
       if(you.star) sparkle(yh.parentElement, yh); if(opp.star) sparkle(oh.parentElement, oh);
-      const label=result==="win"?"勝ち！":result==="lose"?"負け…":"あいこ";
-      slot.innerHTML='<div class="result-pop '+result+'">'+label+'</div>';
-      if(result==="win") confetti(arena);
-    }
-  }, 500);
-  setTimeout(done, 500*3+1500);
+      const label=result==="win"?"勝ち！":result==="lose"?"負け…":"あいこ"; slot.innerHTML='<div class="result-pop '+result+'">'+label+'</div>';
+      if(result==="win"){ flash(); confetti(el("arena")); }
+    } }, 500);
+  setTimeout(done, 500*3+1600);
 }
-
 function onGameOver(m){
   stopPickTimer(); showTimer(false);
-  // 端末に成績を保存
-  P.strength += m.delta; P.games += 1;
-  if(m.result==="win") P.mwins++; else if(m.result==="lose") P.mlosses++;
-  saveProfile(); updateStats();
-  const msg = m.result==="win" ? ("\u2693 星 "+m.yourStar+"\u2014"+m.oppStar+" であなたの勝利！")
-            : m.result==="lose" ? ("\u2620 星 "+m.oppStar+"\u2014"+m.yourStar+" で相手の勝利…")
-            : ("\uD83C\uDFF4 星 "+m.yourStar+"\u2014"+m.oppStar+" で引き分け");
-  el("banner").textContent=msg;
-  showDelta("you-delta", m.delta);
-  el("actions").innerHTML='<button class="btn primary" id="rematch">もう一戦</button> <button class="btn ghost" id="leave">ロビーへ</button>';
+  P.strength += m.delta; P.games += 1; if(m.result==="win") P.mwins++; else if(m.result==="lose") P.mlosses++; saveProfile(); updateStats();
+  const msg = m.result==="win" ? ("\u2693 星 "+m.yourStar+"\u2014"+m.oppStar+" であなたの勝利！") : m.result==="lose" ? ("\u2620 星 "+m.oppStar+"\u2014"+m.yourStar+" で相手の勝利…") : ("\uD83C\uDFF4 星 "+m.yourStar+"\u2014"+m.oppStar+" で引き分け");
+  el("banner").textContent=msg; showDelta("you-delta", m.delta);
+  el("actions").innerHTML='<button class="btn primary" id="rematch">もう一戦</button> <button class="btn blue" id="leave">ロビーへ</button>';
   el("rematch").onclick=()=>{ send({t:"rematch"}); el("banner").textContent="相手のもう一戦を待っています…"; el("actions").innerHTML=""; };
   el("leave").onclick=()=>{ joinedGame=false; if(ws){ ws.onclose=null; try{ws.close();}catch(e){} } el("game").classList.add("hidden"); el("lobby").classList.remove("hidden"); };
-  if(m.result==="win") confetti(el("arena"));
+  if(m.result==="win"){ flash(); confetti(el("arena")); }
 }
 </script>

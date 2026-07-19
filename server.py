@@ -20,9 +20,13 @@ from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 BASE = Path(__file__).parent
+IMG_DIR = BASE / "images"
+IMG_DIR.mkdir(exist_ok=True)
+app.mount("/img", StaticFiles(directory=str(IMG_DIR)), name="img")
 
 BEATS = {"goo": "choki", "choki": "paa", "paa": "goo"}
 TOTAL_ROUNDS = 5
@@ -49,6 +53,7 @@ class Player:
         self.name = (name or "海賊").strip()[:12] or "海賊"
         self.token = uuid.uuid4().hex
         self.color = "#2f6d86"
+        self.char = "1"
         self.room = None
         self.deck = make_deck()
         self.star = 0
@@ -88,6 +93,9 @@ def apply_profile(p, msg):
     c = str(msg.get("color", ""))
     if c.startswith("#") and 4 <= len(c) <= 9:
         p.color = c
+    ch = str(msg.get("char", "1"))
+    if ch.isalnum() and len(ch) <= 4:
+        p.char = ch
 
 
 class Room:
@@ -120,7 +128,7 @@ def gen_code():
 
 def view(p):
     return {
-        "name": p.name, "color": p.color, "deck": p.deck, "star": p.star,
+        "name": p.name, "color": p.color, "char": p.char, "deck": p.deck, "star": p.star,
         "strength": p.strength, "games": p.games, "mwins": p.mwins, "mlosses": p.mlosses,
         "ready": p.ready, "readyNext": p.ready_next, "connected": p.connected,
     }
